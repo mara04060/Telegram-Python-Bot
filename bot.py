@@ -19,9 +19,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await talk_dialog(update, context)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = load_message('main')
     await send_image(update, context, 'main')
-    await send_text(update, context, text)
+    await send_text(update, context, load_message('main'))
     await show_main_menu(update, context, {
         'start': 'Головне меню',
         'random': 'Дізнатися випадковий цікавий факт 🧠',
@@ -36,9 +35,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def random(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_image(update, context, 'random')
-    prompt = load_prompt('random')
-    response = await chat_gpt.send_question(prompt, 'Давай рандомний факт')
-    await send_text(update, context, response)
+    response = await chat_gpt.send_question(load_prompt('random'), 'Давай рандомний факт')
     await send_text_buttons(
         update, context,
         response,
@@ -52,7 +49,6 @@ async def gpt_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     dialog.mode = "gpt"
     await send_image(update, context, 'gpt')
     await send_text(update, context, load_message("gpt") )
-                    # 'Питай у мене найбезглузныше питання. Я выдповым...')
 
 async def gpt_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     my_massage = await send_text(update, context, "... друкую .. обережно ... чекай...")
@@ -70,7 +66,6 @@ async def random_buttons_handler(update: Update, context):
 async def talk_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     dialog.mode = 'talk'
     await send_image(update, context, 'talk')
-    # await send_text(update, context, load_message("talk"))
     await send_text_buttons(update, context, load_message("talk"), {
         "talk_cobain": "Курт Кобейн",
         "talk_hawking": "Стівен Гокінг",
@@ -81,14 +76,14 @@ async def talk_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def talk_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
-    await send_html(update, context, f"{update.callback_query.from_user.first_name} ви починаэте дыалог з  {update.callback_query.data} \r починай дыалог без привытання - выдразу щось по темы.")
-    # await talk_dialog(update, context, file_name)
-
+    await send_image(update, context, update.callback_query.data)
+    text_message = f"{update.callback_query.from_user.first_name} ви починаэте дыалог без привытання - выдразу щось по темы."
+    await send_text(update, context, text_message)
+    chat_gpt.set_prompt(load_prompt(update.callback_query.data))
 
 async def talk_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print_message = await send_text(update, context, "... щось друкуэ...")
-    print(update.callback_query.data, update.message.text)
-    answer = await chat_gpt.send_question(load_prompt(update.callback_query.data), update.message.text)
+    answer = await chat_gpt.add_message(update.message.text)
     await print_message.edit_text(answer)
 
 dialog = Dialog()
