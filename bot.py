@@ -17,6 +17,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await gpt_dialog(update, context)
     elif dialog.mode == "talk":
         await talk_dialog(update, context)
+    elif dialog.mode == "quiz":
+        await quiz_dialog(update, context)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_image(update, context, 'main')
@@ -35,10 +37,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def random(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_image(update, context, 'random')
-    response = await chat_gpt.send_question(load_prompt('random'), 'Давай рандомний факт')
+    answer = await chat_gpt.send_question(load_prompt('random'), 'Давай рандомний факт')
     await send_text_buttons(
         update, context,
-        response,
+        answer,
         {
             'random_finish' : 'Закінчити',
             'random_one_more' :'Хочу ще факт',
@@ -86,6 +88,47 @@ async def talk_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = await chat_gpt.add_message(update.message.text)
     await print_message.edit_text(answer)
 
+async def quiz_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    dialog.mode = 'quiz'
+    await send_image(update, context, 'quiz')
+    await send_text_buttons(update, context, load_message("quiz"), {
+        "quiz_prog": "Python3 - рулить - ти лише підрулюєш",
+        "quiz_math": "Математика без стресу",
+        "quiz_biology": "Біологыя - понад усе",
+        "quiz_more": "Випадкова тема з перелычених"
+    })
+
+async def quiz_buttons_handler(update: Update, context):
+    query = update.callback_query.data
+    if query == 'quiz_finish':
+        await start(update, context)
+    elif query == 'quiz_new_quiz':
+        await quiz_start(update, context)
+    else:
+        await quiz_button(update, context)
+    await update.callback_query.answer()
+
+async def quiz_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # await send_image(update, context, 'quiz')
+    answer = await chat_gpt.send_question(load_prompt('quiz'), update.callback_query.data)
+    await send_text(update, context, answer)
+
+
+async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print_message = await send_text(update, context, "... перевыряю...")
+    answer = await chat_gpt.add_message(update.message.text)
+    await print_message.edit_text(answer)
+    await send_text_buttons(
+        update, context,
+        "Обери подальшу дію:",
+        {
+            'quiz_more': 'продовжити цю тему',
+            'quiz_finish': 'Закінчити',
+            'quiz_new_quiz': 'Нове питання.',
+        }
+    )
+
+
 dialog = Dialog()
 dialog.mode = ""
 
@@ -99,9 +142,11 @@ app.add_handler(CommandHandler('start', start))
 app.add_handler(CommandHandler('random', random))
 app.add_handler(CommandHandler('gpt', gpt_start))
 app.add_handler(CommandHandler('talk', talk_start))
+app.add_handler(CommandHandler('quiz', quiz_start))
 
 # Зареєструвати обробник колбеку можна так:
 app.add_handler(CallbackQueryHandler(random_buttons_handler, pattern='^random_.*'))
 app.add_handler(CallbackQueryHandler(talk_button, pattern='^talk_.*'))
+app.add_handler(CallbackQueryHandler(quiz_buttons_handler, pattern='^quiz_.*'))
 app.add_handler(CallbackQueryHandler(default_callback_handler))
 app.run_polling()
