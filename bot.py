@@ -79,7 +79,7 @@ async def talk_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def talk_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
     await send_image(update, context, update.callback_query.data)
-    text_message = f"{update.callback_query.from_user.first_name} ви починаэте дыалог без привытання - выдразу щось по темы."
+    text_message = f"{update.callback_query.from_user.first_name} ви починаэте діалог без привітання - відразу щось по темі."
     await send_text(update, context, text_message)
     chat_gpt.set_prompt(load_prompt(update.callback_query.data))
 
@@ -94,8 +94,8 @@ async def quiz_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_text_buttons(update, context, load_message("quiz"), {
         "quiz_prog": "Python3 - рулить - ти лише підрулюєш",
         "quiz_math": "Математика без стресу",
-        "quiz_biology": "Біологыя - понад усе",
-        "quiz_more": "Випадкова тема з перелычених"
+        "quiz_biology": "Біологія - понад усе",
+        "quiz_more": "Випадкова тема з перелічених"
     })
 
 async def quiz_buttons_handler(update: Update, context):
@@ -115,7 +115,7 @@ async def quiz_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print_message = await send_text(update, context, "... перевыряю...")
+    print_message = await send_text(update, context, "... перевіряю...")
     answer = await chat_gpt.add_message(update.message.text)
     await print_message.edit_text(answer)
     await send_text_buttons(
