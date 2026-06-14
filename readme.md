@@ -49,3 +49,31 @@
 
 
 ### 5. **Тема на вибір** (опціональні)
+
+
+### Додаткові налаштування для запуску Docker
+
+Для запуску збірки Docker:
+<p /><code>
+    docker build -t telegram-bot .
+</code>
+<p />
+
+Запуск контейнеру:
+<p />
+<code>
+    docker run -d --name my-telegram-bot telegram-bot
+</code>
+<p />
+
+Якщо ключі НЕ зберігаються у <b>.env</b>, тоды ъх можна додавати через параметри при запуску контейнеру
+<p>
+<code>
+docker run -d --name my-telegram-bot \<br />
+-e BOT_TOKEN="YOUR_TELEGRAM_BOT_TOKEN" \<br />
+-e CHATGPT_TOKEN="YOUR_CHATGPT_API_KEY" \<br />
+-a PROXY="YOUR PROXY ChatGPT" \<br />
+telegram-bot
+</code>
+</p>
+
