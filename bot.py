@@ -140,6 +140,8 @@ async def quiz_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("quiz_dialog")
+    print_message = ""
+    answer = ""
     try:
         print_message = await send_text(update, context, "... перевіряю...")
         answer = await get_gpt(context).add_message(update.message.text)
