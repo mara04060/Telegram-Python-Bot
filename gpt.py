@@ -1,8 +1,4 @@
 from openai import AsyncOpenAI
-import httpx as httpx
-
-import credentials
-
 
 class ChatGptService:
     client: AsyncOpenAI = None
