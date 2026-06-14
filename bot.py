@@ -74,7 +74,7 @@ async def gpt_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # context.user_data["mode"] = "gpt"
     await send_image(update, context, 'gpt')
     await send_text(update, context, load_message("gpt") )
-    # return State.GPT
+    return State.GPT # FIX: Added return State.GPT    # return State.GPT
 
 async def gpt_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("gpt_dialog")
@@ -177,8 +177,8 @@ conv = ConversationHandler(
         State.RANDOM: [CallbackQueryHandler(random_buttons_handler,pattern="^random_.*$")],
         State.GPT: [MessageHandler(filters.TEXT & ~filters.COMMAND, gpt_dialog), ],
         State.TALK_SELECT: [CallbackQueryHandler(talk_button, pattern="^talk_.*$")],
-        State.TALK_DIALOG: [MessageHandler(filters.TEXT & filters.COMMAND, talk_dialog),],
-        State.QUIZ_DIALOG: [MessageHandler(filters.TEXT & filters.COMMAND, quiz_dialog),
+        State.TALK_DIALOG: [MessageHandler(filters.TEXT & ~filters.COMMAND, talk_dialog),],
+        State.QUIZ_DIALOG: [MessageHandler(filters.TEXT & ~filters.COMMAND, quiz_dialog),
                            CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_(finish|new_quiz)$")]
             },
     fallbacks=[CommandHandler("start", start)],
