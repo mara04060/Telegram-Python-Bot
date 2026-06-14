@@ -27,7 +27,7 @@ class ChatGptService:
         # self.message_list.append(message)
         return message.content or ""
 
-    def set_prompt(self, prompt_text: str) -> None:
+    async def set_prompt(self, prompt_text: str) -> None:
         self.message_list.clear()
         self.message_list.append({"role": "system", "content": prompt_text})
 

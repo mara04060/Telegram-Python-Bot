@@ -89,12 +89,7 @@ def load_prompt(name):
         return file.read()
 
 
-async def default_callback_handler(update: Update,
-                                   context: ContextTypes.DEFAULT_TYPE):
+async def default_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
     query = update.callback_query.data
     await send_html(update, context, f'You have pressed button with {query} callback')
-
-
-class Dialog:
-    pass

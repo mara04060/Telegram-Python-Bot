@@ -10,23 +10,38 @@ from util import (load_message, send_text, send_image, show_main_menu,
                   default_callback_handler, load_prompt, send_text_buttons)
 
 
+# def log_info(func):
+#     @wraps(func)
+#     async def wrapper(*args, **kwargs):
+#         print(f"START {func.__name__}")
+#         result = await func(*args, **kwargs)
+#         print(f"END {func.__name__}")
+#         return result
+#     return wrapper
+
+
 async def menu_router(update: Update,context: ContextTypes.DEFAULT_TYPE):
     logger.info("menu_router")
-    logger.info(update.message.text)
+    logger.info("message: %s", update.message.text)
     if not update.message or not update.message.text:
         return State.MAIN
 
     command = update.message.text.lower()
+    logger.debug("command: %s, message text: %s", command, update.callback_query.data if update.callback_query else "No callback data")
     if "random" in command:
-        return await random(update, context)
+        return State.RANDOM
+        # return await random(update, context)
     elif "gpt" in command:
-        return await gpt_start(update, context)
+        return State.GPT
+        # return await gpt_start(update, context)
     elif "talk" in command:
-        return await talk_start(update, context)
+        return State.TALK_SELECT
+        # return await talk_start(update, context)
     elif "quiz" in command:
-        return await quiz_start(update, context)
-    # else:
-    #     return State.MAIN
+        return State.QUIZ_SELECT
+        # return await quiz_start(update, context)
+    else:
+        return State.MAIN
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("start")
@@ -66,15 +81,13 @@ async def random_buttons_handler(update: Update, context):
         return await start(update, context)
     elif query == 'random_one_more':
         return await random(update, context)
-
-    # return State.RANDOM
+    return State.RANDOM
 
 async def gpt_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("gpt_start")
-    # context.user_data["mode"] = "gpt"
     await send_image(update, context, 'gpt')
     await send_text(update, context, load_message("gpt") )
-    return State.GPT # FIX: Added return State.GPT    # return State.GPT
+    return State.GPT
 
 async def gpt_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("gpt_dialog")
@@ -86,7 +99,6 @@ async def gpt_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def talk_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("talk_start")
-    # context.user_data["mode"] = 'talk'
     await send_image(update, context, 'talk')
     await send_text_buttons(update, context, load_message("talk"), {
         "talk_cobain": "Курт Кобейн",
@@ -104,21 +116,20 @@ async def talk_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_message = f"{update.callback_query.from_user.first_name} ви починаєте діалог без привітання - відразу щось по темі."
     await send_text(update, context, text_message)
     await get_gpt(context).set_prompt(load_prompt(update.callback_query.data))
-    # return State.TALK_DIALOG
+    return State.TALK_DIALOG
 
 async def talk_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("talk_dialog")
     print_message = await send_text(update, context, "... щось друкуэ...")
     try:
         answer = await get_gpt(context).add_message(update.message.text)
-    except Exception as e:
-        await send_text(update, context,"Помилка при зверненні до GPT" )
-    await print_message.edit_text(answer)
+        await print_message.edit_text(answer)
+    except Exception:
+        await print_message.edit_text("Помилка при зверненні до GPT -крок talk_dialog")
     return State.TALK_DIALOG
 
 async def quiz_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("quiz_start")
-    # context.user_data["mode"] = 'quiz'
     await send_image(update, context, 'quiz')
     await send_text_buttons(update, context, load_message("quiz"), {
         "quiz_prog": "Python3 - рулить - ти лише підрулюєш",
@@ -142,13 +153,15 @@ async def quiz_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("quiz_button")
     answer = await get_gpt(context).send_question(load_prompt('quiz'), update.callback_query.data)
     await send_text(update, context, answer)
-    # return State.QUIZ_DIALOG
-
+    return State.QUIZ_DIALOG
 
 async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("quiz_dialog")
-    print_message = await send_text(update, context, "... перевіряю...")
-    answer = await get_gpt(context).add_message(update.message.text)
+    try:
+        print_message = await send_text(update, context, "... перевіряю...")
+        answer = await get_gpt(context).add_message(update.message.text)
+    except Exception as e:
+        await print_message.edit_text("Помилка при зверненні до GPT -крок quiz_dialog")
     await print_message.edit_text(answer)
     await send_text_buttons(
         update, context,
@@ -171,15 +184,22 @@ conv = ConversationHandler(
     entry_points=[
         CommandHandler("start", start),
         CommandHandler("random", random),
+        CommandHandler("talk", talk_start),
+        CommandHandler("quiz", quiz_start),
         CommandHandler("gpt", gpt_start)
     ],
-    states={State.MAIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, menu_router )],
+    states={
+        State.MAIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, menu_router )],
         State.RANDOM: [CallbackQueryHandler(random_buttons_handler,pattern="^random_.*$")],
         State.GPT: [MessageHandler(filters.TEXT & ~filters.COMMAND, gpt_dialog), ],
         State.TALK_SELECT: [CallbackQueryHandler(talk_button, pattern="^talk_.*$")],
         State.TALK_DIALOG: [MessageHandler(filters.TEXT & ~filters.COMMAND, talk_dialog),],
+        State.QUIZ_SELECT: [
+                            # MessageHandler(filters.TEXT & ~filters.COMMAND, quiz_start),
+                            CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_.*$")
+                           ],
         State.QUIZ_DIALOG: [MessageHandler(filters.TEXT & ~filters.COMMAND, quiz_dialog),
-                           CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_(finish|new_quiz)$")]
+                            CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_(finish|new_quiz)$")]
             },
     fallbacks=[CommandHandler("start", start)],
     per_chat=True,
@@ -187,7 +207,6 @@ conv = ConversationHandler(
     per_message=False
 )
 
-# Зареєструвати обробник колбеку можна так:
 app = ApplicationBuilder().token(credentials.BOT_TOKEN).build()
 app.add_handler(conv)
 app.add_handler(CallbackQueryHandler(default_callback_handler))
