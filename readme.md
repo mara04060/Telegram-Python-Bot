@@ -66,7 +66,7 @@
 </code>
 <p />
 
-Якщо ключі НЕ зберігаються у <b>.env</b>, тоды ъх можна додавати через параметри при запуску контейнеру
+Якщо ключі НЕ зберігаються у <b>.env</b>, тоді їх можна додавати через параметри при запуску контейнеру
 <p>
 <code>
 docker run -d --name my-telegram-bot \<br />
@@ -78,9 +78,8 @@ telegram-bot
 </p>
 
 **Зупинка контейнеру:**
-<p>
 <code>
-docker stop _Hash_container_
+docker stop _hash_container_
 </code>
-</p>
+
 
