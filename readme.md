@@ -77,3 +77,10 @@ telegram-bot
 </code>
 </p>
 
+**Зупинка контейнеру:**
+<p>
+<code>
+docker stop _Hash_container_
+</code>
+</p>
+
