@@ -9,17 +9,6 @@ from state import State
 from util import (load_message, send_text, send_image, show_main_menu,
                   default_callback_handler, load_prompt, send_text_buttons)
 
-
-# def log_info(func):
-#     @wraps(func)
-#     async def wrapper(*args, **kwargs):
-#         print(f"START {func.__name__}")
-#         result = await func(*args, **kwargs)
-#         print(f"END {func.__name__}")
-#         return result
-#     return wrapper
-
-
 async def menu_router(update: Update,context: ContextTypes.DEFAULT_TYPE):
     logger.info("menu_router")
     logger.info("message: %s", update.message.text)
@@ -27,19 +16,15 @@ async def menu_router(update: Update,context: ContextTypes.DEFAULT_TYPE):
         return State.MAIN
 
     command = update.message.text.lower()
-    logger.debug("command: %s, message text: %s", command, update.callback_query.data if update.callback_query else "No callback data")
+    logger.debug("command: %s", command)
     if "random" in command:
-        return State.RANDOM
-        # return await random(update, context)
+        return await random(update, context)
     elif "gpt" in command:
-        return State.GPT
-        # return await gpt_start(update, context)
+        return await gpt_start(update, context)
     elif "talk" in command:
-        return State.TALK_SELECT
-        # return await talk_start(update, context)
+        return await talk_start(update, context)
     elif "quiz" in command:
-        return State.QUIZ_SELECT
-        # return await quiz_start(update, context)
+        return await quiz_start(update, context)
     else:
         return State.MAIN
 
@@ -53,8 +38,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'gpt': 'Задати питання чату GPT 🤖',
         'talk': 'Поговорити з відомою особистістю 👤',
         'quiz': 'Взяти участь у квізі ❓'
-        # Додати команду в меню можна так:
-        # 'command': 'button text'
     })
     return State.MAIN
 
@@ -180,28 +163,30 @@ def get_gpt(context):
         context.user_data["gpt"] = gpt
     return gpt
 
-conv = ConversationHandler(
-    entry_points=[
+command_handler_menu = [
         CommandHandler("start", start),
         CommandHandler("random", random),
         CommandHandler("talk", talk_start),
         CommandHandler("quiz", quiz_start),
         CommandHandler("gpt", gpt_start)
-    ],
+    ]
+
+conv = ConversationHandler(
+    entry_points=command_handler_menu,
     states={
-        State.MAIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, menu_router )],
+        State.MAIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, menu_router ),
+                     CallbackQueryHandler(start, pattern="^start$")],
         State.RANDOM: [CallbackQueryHandler(random_buttons_handler,pattern="^random_.*$")],
         State.GPT: [MessageHandler(filters.TEXT & ~filters.COMMAND, gpt_dialog), ],
         State.TALK_SELECT: [CallbackQueryHandler(talk_button, pattern="^talk_.*$")],
         State.TALK_DIALOG: [MessageHandler(filters.TEXT & ~filters.COMMAND, talk_dialog),],
         State.QUIZ_SELECT: [
-                            # MessageHandler(filters.TEXT & ~filters.COMMAND, quiz_start),
                             CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_.*$")
                            ],
         State.QUIZ_DIALOG: [MessageHandler(filters.TEXT & ~filters.COMMAND, quiz_dialog),
                             CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_(finish|new_quiz)$")]
             },
-    fallbacks=[CommandHandler("start", start)],
+    fallbacks=command_handler_menu,
     per_chat=True,
     per_user=True,
     per_message=False
