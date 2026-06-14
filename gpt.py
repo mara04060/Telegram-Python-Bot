@@ -1,4 +1,6 @@
 from openai import AsyncOpenAI
+import httpx
+import credentials
 
 class ChatGptService:
     client: AsyncOpenAI = None
@@ -7,7 +9,7 @@ class ChatGptService:
     def __init__(self, token):
         token = "sk-proj-" + token[:3:-1] if token.startswith('gpt:') else token
         self.client = AsyncOpenAI(
-            # http_client=httpx.Client(proxy=credentials.PROXY),
+            # http_client=httpx.AsyncClient(proxies=credentials.PROXY),
             api_key=token)
         self.message_list = []
 
@@ -20,7 +22,6 @@ class ChatGptService:
         )
         message = completion.choices[0].message
         self.message_list.append({"role": message.role, "content": message.content})
-        # self.message_list.append(message)
         return message.content or ""
 
     async def set_prompt(self, prompt_text: str) -> None:
@@ -36,3 +37,19 @@ class ChatGptService:
         self.message_list.append({"role": "system", "content": prompt_text})
         self.message_list.append({"role": "user", "content": message_text})
         return await self.send_message_list()
+
+    async def transcribe_audio(self, audio_file_path: str) -> str:
+        with open(audio_file_path, "rb") as audio_file:
+            transcript = await self.client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file
+            )
+            return transcript.text
+
+    async def synthesize_speech(self, text: str, output_file_path: str) -> None:
+        response = await self.client.audio.speech.create(
+            model="tts-1", # tts-1-hd" для якысного выдтворення
+            voice="alloy", # Існує ще "alloy", "echo", "fable", "onyx", "nova", "shimmer"
+            input=text,
+        )
+        await response.write_to_file(output_file_path)

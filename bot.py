@@ -1,3 +1,4 @@
+import tempfile
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, ContextTypes, CommandHandler, ConversationHandler, \
     MessageHandler, filters
@@ -8,6 +9,7 @@ from log_info import logger
 from state import State
 from util import (load_message, send_text, send_image, show_main_menu,
                   default_callback_handler, load_prompt, send_text_buttons)
+
 
 async def menu_router(update: Update,context: ContextTypes.DEFAULT_TYPE):
     logger.info("menu_router")
@@ -25,6 +27,8 @@ async def menu_router(update: Update,context: ContextTypes.DEFAULT_TYPE):
         return await talk_start(update, context)
     elif "quiz" in command:
         return await quiz_start(update, context)
+    elif "voice" in command:
+        return await voice_start(update, context)
     else:
         return State.MAIN
 
@@ -37,7 +41,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'random': 'Дізнатися випадковий цікавий факт 🧠',
         'gpt': 'Задати питання чату GPT 🤖',
         'talk': 'Поговорити з відомою особистістю 👤',
-        'quiz': 'Взяти участь у квізі ❓'
+        'quiz': 'Взяти участь у квізі ❓',
+        'voice': 'Голосовий ChatGPT 🎤'
     })
     return State.MAIN
 
@@ -158,6 +163,63 @@ async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return State.QUIZ_DIALOG
 
+async def voice_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("voice_start")
+    await send_image(update, context, 'voice')
+    await send_text(update, context, load_message("voice"))
+    await send_text_buttons(update, context, "Надішліть голосове повідомлення або оберіть дію:", {
+        'voice_finish': 'Закінчити голосовий чат',
+    })
+    return State.VOICE_DIALOG
+
+async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("voice_message_handler")
+    if not update.message or not update.message.voice:
+        await send_text(update, context, "Будь ласка, надішліть голосове повідомлення.")
+        return State.VOICE_DIALOG
+
+    user_message = await send_text(update, context, "... розпізнаю мову ...")
+
+    try:
+        voice_file = await update.message.voice.get_file()
+        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=True) as temp_audio_file:
+            await voice_file.download_to_memory(out=temp_audio_file)
+            temp_audio_file.seek(0)
+
+            transcribed_text = await get_gpt(context).transcribe_audio(temp_audio_file.name)
+            await user_message.edit_text(f"Ви сказали: \"{transcribed_text}\"\n... думаю ...")
+
+            gpt_response_text = await get_gpt(context).add_message(transcribed_text)
+            await user_message.edit_text(f"Ви сказали: \"{transcribed_text}\"\nВідповідь GPT: \"{gpt_response_text}\"\n... генерую голос ...")
+
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=True) as temp_response_audio_file:
+                await get_gpt(context).synthesize_speech(gpt_response_text, temp_response_audio_file.name)
+                temp_response_audio_file.seek(0)
+
+                await update.message.reply_voice(voice=temp_response_audio_file)
+
+    except Exception as e:
+        logger.error(f"Error in voice_message_handler: {e}")
+        await user_message.edit_text("Виникла помилка під час обробки голосового повідомлення. Спробуйте ще раз.")
+
+    await send_text_buttons(update, context, "Продовжити голосовий чат?", {
+        'voice_finish': 'Закінчити голосовий чат',
+        'voice_continue': 'Продовжити',
+    })
+    return State.VOICE_DIALOG
+
+async def voice_buttons_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("voice_buttons_handler")
+    await update.callback_query.answer()
+    query = update.callback_query.data
+    if query == 'voice_finish':
+        return await start(update, context)
+    elif query == 'voice_continue':
+        await send_text(update, context, "Чекаю на ваше голосове повідомлення.")
+        return State.VOICE_DIALOG
+    return State.VOICE_DIALOG
+
+
 def get_gpt(context):
     gpt = context.user_data.get("gpt")
     if gpt is None:
@@ -170,7 +232,8 @@ command_handler_menu = [
         CommandHandler("random", random),
         CommandHandler("talk", talk_start),
         CommandHandler("quiz", quiz_start),
-        CommandHandler("gpt", gpt_start)
+        CommandHandler("gpt", gpt_start),
+        CommandHandler("voice", voice_start)
     ]
 
 conv = ConversationHandler(
@@ -186,8 +249,13 @@ conv = ConversationHandler(
                             CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_.*$")
                            ],
         State.QUIZ_DIALOG: [MessageHandler(filters.TEXT & ~filters.COMMAND, quiz_dialog),
-                            CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_(finish|new_quiz)$")]
-            },
+                            CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_(finish|new_quiz)$")],
+        State.VOICE_DIALOG: [
+            MessageHandler(filters.VOICE, voice_message_handler),
+            CallbackQueryHandler(voice_buttons_handler, pattern="^voice_.*$"),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, voice_message_handler)
+        ]
+    },
     fallbacks=command_handler_menu,
     per_chat=True,
     per_user=True,
