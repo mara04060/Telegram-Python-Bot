@@ -11,7 +11,7 @@ class ChatGptService:
     def __init__(self, token):
         token = "sk-proj-" + token[:3:-1] if token.startswith('gpt:') else token
         self.client = AsyncOpenAI(
-            http_client=httpx.Client(proxy=credentials.PROXY),
+            # http_client=httpx.Client(proxy=credentials.PROXY),
             api_key=token)
         self.message_list = []
 
@@ -23,7 +23,8 @@ class ChatGptService:
             temperature=0.9
         )
         message = completion.choices[0].message
-        self.message_list.append(message)
+        self.message_list.append({"role": message.role, "content": message.content})
+        # self.message_list.append(message)
         return message.content or ""
 
     def set_prompt(self, prompt_text: str) -> None:
