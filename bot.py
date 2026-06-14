@@ -176,6 +176,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info("voice_message_handler")
     if not update.message or not update.message.voice:
         await send_text(update, context, "Будь ласка, надішліть голосове повідомлення.")
+        await get_gpt(context).set_prompt(load_prompt('voice'))
         return State.VOICE_DIALOG
 
     user_message = await send_text(update, context, "... розпізнаю мову ...")
