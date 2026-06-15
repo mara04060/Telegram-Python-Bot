@@ -1,6 +1,5 @@
 from openai import AsyncOpenAI
-import httpx
-import credentials
+
 
 class ChatGptService:
     client: AsyncOpenAI = None
@@ -8,9 +7,7 @@ class ChatGptService:
 
     def __init__(self, token):
         token = "sk-proj-" + token[:3:-1] if token.startswith('gpt:') else token
-        self.client = AsyncOpenAI(
-            # http_client=httpx.AsyncClient(proxies=credentials.PROXY),
-            api_key=token)
+        self.client = AsyncOpenAI(api_key=token)
         self.message_list = []
 
     async def send_message_list(self) -> str:
@@ -47,9 +44,12 @@ class ChatGptService:
             return transcript.text
 
     async def synthesize_speech(self, text: str, output_file_path: str) -> None:
-        response = await self.client.audio.speech.create(
-            model="tts-1", # tts-1-hd" для якысного выдтворення
-            voice="alloy", # Існує ще "alloy", "echo", "fable", "onyx", "nova", "shimmer"
-            input=text,
+        response = await self. client.chat.completions.create(
+            messages= [{"role": "user","content": text}],
+            model="gpt-audio-1.5",
+            modalities=["text", "audio"],
+            audio={"voice": "alloy", "format": "wav"}
         )
-        await response.write_to_file(output_file_path)
+        wav_bytes = base64.b64decode(response.choices[0].message.audio.data)
+        with open(output_file_path, "wb") as f:
+            f.write(wav_bytes)

@@ -30,6 +30,7 @@ async def menu_router(update: Update,context: ContextTypes.DEFAULT_TYPE):
     elif "voice" in command:
         return await voice_start(update, context)
     else:
+        await send_text(update, context, "Неіснуюча команда, оберіть будь-яку з меню.")
         return State.MAIN
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -112,8 +113,10 @@ async def talk_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         answer = await get_gpt(context).add_message(update.message.text)
         await print_message.edit_text(answer)
-    except Exception:
-        await print_message.edit_text("Помилка при зверненні до GPT -крок talk_dialog")
+    except Exception as e:
+        error_text = "Помилка при зверненні до GPT -крок talk_dialog"
+        logger.error("%s: %s",error_text, e)
+        await print_message.edit_text(error_text)
     return State.TALK_DIALOG
 
 async def quiz_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -145,16 +148,17 @@ async def quiz_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("quiz_dialog")
-    print_message = ""
+    print_message = None
     answer = ""
     try:
         print_message = await send_text(update, context, "... перевіряю...")
         answer = await get_gpt(context).add_message(update.message.text)
     except Exception as e:
-        await print_message.edit_text("Помилка при зверненні до GPT -крок quiz_dialog")
+        error_text = "Помилка при зверненні до GPT -крок quiz_dialog"
+        logger.error("%s: %s",error_text, e)
+        await print_message.edit_text(error_text)
     await print_message.edit_text(answer)
-    await send_text_buttons(
-        update, context,
+    await send_text_buttons( update, context,
         "Обери подальшу дію:",
         {
             'quiz_finish': 'Закінчити',
@@ -167,9 +171,6 @@ async def voice_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("voice_start")
     await send_image(update, context, 'voice')
     await send_text(update, context, load_message("voice"))
-    await send_text_buttons(update, context, "Надішліть голосове повідомлення або оберіть дію:", {
-        'voice_finish': 'Закінчити голосовий чат',
-    })
     return State.VOICE_DIALOG
 
 async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -188,37 +189,30 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
             temp_audio_file.seek(0)
 
             transcribed_text = await get_gpt(context).transcribe_audio(temp_audio_file.name)
-            await user_message.edit_text(f"Ви сказали: \"{transcribed_text}\"\n... думаю ...")
-
             gpt_response_text = await get_gpt(context).add_message(transcribed_text)
-            await user_message.edit_text(f"Ви сказали: \"{transcribed_text}\"\nВідповідь GPT: \"{gpt_response_text}\"\n... генерую голос ...")
 
-            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=True) as temp_response_audio_file:
+            with tempfile.NamedTemporaryFile(suffix=".waw", delete=True) as temp_response_audio_file:
                 await get_gpt(context).synthesize_speech(gpt_response_text, temp_response_audio_file.name)
                 temp_response_audio_file.seek(0)
-
                 await update.message.reply_voice(voice=temp_response_audio_file)
 
     except Exception as e:
-        logger.error(f"Error in voice_message_handler: {e}")
-        await user_message.edit_text("Виникла помилка під час обробки голосового повідомлення. Спробуйте ще раз.")
+        error_text = "Виникла помилка під час обробки голосового повідомлення"
+        logger.error("%s: %s", error_text, e)
+        await user_message.edit_text(f"{error_text }")
 
-    await send_text_buttons(update, context, "Продовжити голосовий чат?", {
-        'voice_finish': 'Закінчити голосовий чат',
-        'voice_continue': 'Продовжити',
+    await send_text_buttons(update, context, "Або давай далы питання - або:", {
+        'voice_finish': 'Закінчити голосовий чат'
     })
     return State.VOICE_DIALOG
 
 async def voice_buttons_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("voice_buttons_handler")
     await update.callback_query.answer()
-    query = update.callback_query.data
-    if query == 'voice_finish':
+    if update.callback_query.data == 'voice_finish':
         return await start(update, context)
-    elif query == 'voice_continue':
-        await send_text(update, context, "Чекаю на ваше голосове повідомлення.")
-        return State.VOICE_DIALOG
     return State.VOICE_DIALOG
+
 
 
 def get_gpt(context):
