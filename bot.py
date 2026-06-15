@@ -1,3 +1,4 @@
+import os
 import tempfile
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, ContextTypes, CommandHandler, ConversationHandler, \
@@ -175,34 +176,55 @@ async def voice_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("voice_message_handler")
-    if not update.message or not update.message.voice:
-        await send_text(update, context, "Будь ласка, надішліть голосове повідомлення.")
-        await get_gpt(context).set_prompt(load_prompt('voice'))
+    if update.message and update.message.text:
+        if update.message.text.lower() == "закінчити":
+            return await start(update, context)
+
+        await send_text(update, context, "Будь ласка, надішліть голосове повідомлення або натисніть кнопку.")
         return State.VOICE_DIALOG
 
-    user_message = await send_text(update, context, "... розпізнаю мову ...")
+    if not update.message or not update.message.voice:
+        await send_text(update, context, "Будь ласка, надішліть голосове повідомлення.")
+        return State.VOICE_DIALOG
+
+    user_message_status = await send_text(update, context, "... розпізнаю мову ...")  # FIX: Переименовал для ясности.
 
     try:
         voice_file = await update.message.voice.get_file()
-        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=True) as temp_audio_file:
+        with tempfile.NamedTemporaryFile(suffix=".ogg",delete=False) as temp_audio_file:
             await voice_file.download_to_memory(out=temp_audio_file)
-            temp_audio_file.seek(0)
+            temp_audio_file_path = temp_audio_file.name
 
-            transcribed_text = await get_gpt(context).transcribe_audio(temp_audio_file.name)
-            gpt_response_text = await get_gpt(context).add_message(transcribed_text)
+        transcribed_text = await get_gpt(context).transcribe_audio(temp_audio_file_path)
+        await user_message_status.edit_text(f"Ви сказали: \"{transcribed_text}\"\n... думаю ...")
 
-            with tempfile.NamedTemporaryFile(suffix=".waw", delete=True) as temp_response_audio_file:
-                await get_gpt(context).synthesize_speech(gpt_response_text, temp_response_audio_file.name)
-                temp_response_audio_file.seek(0)
-                await update.message.reply_voice(voice=temp_response_audio_file)
+        gpt_response_text = await get_gpt(context).add_message(transcribed_text)
+        await user_message_status.edit_text(f"Ви сказали: \"{transcribed_text}\"\nВідповідь GPT: \"{gpt_response_text}\"\n... генерую голос ...")
+
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_response_audio_file:
+            await get_gpt(context).synthesize_speech(gpt_response_text, temp_response_audio_file.name)
+            temp_response_audio_file_path = temp_response_audio_file.name
+
+        with open(temp_response_audio_file_path, "rb") as audio_to_send:
+            await update.message.reply_voice(voice=audio_to_send)
 
     except Exception as e:
-        error_text = "Виникла помилка під час обробки голосового повідомлення"
-        logger.error("%s: %s", error_text, e)
-        await user_message.edit_text(f"{error_text }")
+        logger.error("Ошибка в voice_message_handler: %s", e)
+        if user_message_status:
+            await user_message_status.edit_text(
+                "Виникла помилка під час обробки голосового повідомлення. Спробуйте ще раз.")
+        else:
+            await send_text(update, context,
+                            "Виникла помилка під час обробки голосового повідомлення. Спробуйте ще раз.")
+    finally:
+        if 'temp_audio_file_path' in locals() and temp_audio_file_path:
+            os.remove(temp_audio_file_path)
+        if 'temp_response_audio_file_path' in locals() and temp_response_audio_file_path:
+            os.remove(temp_response_audio_file_path)
 
-    await send_text_buttons(update, context, "Або давай далы питання - або:", {
-        'voice_finish': 'Закінчити голосовий чат'
+    await send_text_buttons(update, context, "Продовжити голосовий чат?", {
+        'voice_finish': 'Закінчити голосовий чат',
+        'voice_continue': 'Продовжити',
     })
     return State.VOICE_DIALOG
 

@@ -1,4 +1,5 @@
 from openai import AsyncOpenAI
+import base64
 
 
 class ChatGptService:
