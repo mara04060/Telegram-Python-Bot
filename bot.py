@@ -271,51 +271,52 @@ async def profile_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("profile_start")
     await send_image(update, context, 'profile')
     await send_text(update, context, load_message("profile"))
-
     context.user_data["resume_data"] = []
     context.user_data["resume_question_index"] = 0
-
     current_question_index = context.user_data["resume_question_index"]
     await send_text(update, context, RESUME_QUESTIONS[current_question_index])
 
     return State.PROFILE_DIALOG
 
-#ToDo Декомпозицыя. Дуже важка для розумыння ф-ція
-async def profile_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info("profile_dialog")
-    user_answer = update.message.text
-    resume_data = context.user_data.get("resume_data", [])
+def add_question(context, update, resume_data):
     current_question_index = context.user_data.get("resume_question_index", 0)
-
     if current_question_index < len(RESUME_QUESTIONS):
-        resume_data.append(f"{RESUME_QUESTIONS[current_question_index]} {user_answer}")
+        resume_data.append(f"{RESUME_QUESTIONS[current_question_index]} {update.message.text}")
         context.user_data["resume_data"] = resume_data
         context.user_data["resume_question_index"] += 1
         current_question_index += 1
+    return current_question_index
 
+async def send_questions_in_dialog(update, context, resume_data, current_question_index):
     if current_question_index < len(RESUME_QUESTIONS):
         await send_text(update, context, RESUME_QUESTIONS[current_question_index])
         return State.PROFILE_DIALOG
     else:
-        prompt = load_prompt("profile")
-        user_info = "\n".join(resume_data)
+        return await generation_resume(update, context, resume_data)
 
-        my_message = await send_text(update, context, "...ChatGPT генерує Ваше резюме...")
-        try:
-            answer = await get_gpt(context).send_question(prompt, user_info)
-            await my_message.edit_text(answer)
-        except Exception as e:
-            error_code = "Виникла помилка під час генерації резюме"
-            logger.error("%s : %s",error_code, e)
-            await my_message.edit_text(error_code)
+async def generation_resume(update, context, resume_data):
+    prompt = load_prompt("profile")
+    user_info = "\n".join(resume_data)
+    my_message = await send_text(update, context, "...ChatGPT генерує Ваше резюме...")
+    try:
+        answer = await get_gpt(context).send_question(prompt, user_info)
+        await my_message.edit_text(answer)
+    except Exception as e:
+        error_code = "Виникла помилка під час генерації резюме"
+        logger.error("%s : %s", error_code, e)
+        await my_message.edit_text(error_code)
+    context.user_data["resume_data"] = []
+    context.user_data["resume_question_index"] = 0
+    await send_text_buttons(update, context, "Ваше резюме згенеровано. Повернутись в меню?", {
+        "start": "Повернутись в меню"
+    })
+    return State.MAIN
 
-        context.user_data["resume_data"] = None
-        context.user_data["resume_question_index"] = 0
-
-        await send_text_buttons(update, context, "Ваше резюме згенеровано. Повернутись в меню?", {
-            "start": "Повернутись в меню"
-        })
-        return State.MAIN
+async def profile_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("profile_dialog")
+    resume_data = context.user_data.get("resume_data", [])
+    current_question_index = add_question(context, update, resume_data)
+    await send_questions_in_dialog(update, context, resume_data, current_question_index)
 
 
 async def profile_buttons_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -323,7 +324,7 @@ async def profile_buttons_handler(update: Update, context: ContextTypes.DEFAULT_
     await update.callback_query.answer()
     query = update.callback_query.data
     if query == 'profile_finish':
-        context.user_data["resume_data"] = None
+        context.user_data["resume_data"] = []
         context.user_data["resume_question_index"] = 0
         return await start(update, context)
     return State.PROFILE_DIALOG
