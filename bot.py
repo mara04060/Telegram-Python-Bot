@@ -11,8 +11,17 @@ from state import State
 from util import (load_message, send_text, send_image, show_main_menu,
                   default_callback_handler, load_prompt, send_text_buttons)
 
+#ToDo подумати на майбутнэ як це винести в окремий файл + Формування меню
+RESUME_QUESTIONS = [
+    "ПІБ ТА МІСТО",
+    "БАЖАНА ПОСАДА",
+    "ДОСВІД В IT",
+    "ТЕХНІЧНІ НАВИЧКИ",
+    "ОСТАННЄ МІСЦЕ РОБОТИ",
+    "ОСВІТА ТА ДОДАТКОВА ІНФОРМАЦІЯ"
+]
 
-async def menu_router(update: Update,context: ContextTypes.DEFAULT_TYPE):
+async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("menu_router")
     logger.info("message: %s", update.message.text)
     if not update.message or not update.message.text:
@@ -30,6 +39,8 @@ async def menu_router(update: Update,context: ContextTypes.DEFAULT_TYPE):
         return await quiz_start(update, context)
     elif "voice" in command:
         return await voice_start(update, context)
+    elif "profile" in command:
+        return await profile_start(update, context)
     else:
         await send_text(update, context, "Неіснуюча команда, оберіть будь-яку з меню.")
         return State.MAIN
@@ -38,6 +49,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("start")
     await send_image(update, context, 'main')
     await send_text(update, context, load_message('main'))
+
+    # ToDo подумати на майбутнэ як це винести в окремий файл + Формування меню
     await show_main_menu(update, context, {
         'start': 'Головне меню',
         'random': 'Дізнатися випадковий цікавий факт 🧠',
@@ -58,8 +71,8 @@ async def random(update: Update, context: ContextTypes.DEFAULT_TYPE):
         update, context,
         answer,
         {
-            'random_finish' : 'Закінчити',
-            'random_one_more' :'Хочу ще факт',
+            'random_finish': 'Закінчити',
+            'random_one_more': 'Хочу ще факт',
         }
     )
     return State.RANDOM
@@ -77,7 +90,7 @@ async def random_buttons_handler(update: Update, context):
 async def gpt_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("gpt_start")
     await send_image(update, context, 'gpt')
-    await send_text(update, context, load_message("gpt") )
+    await send_text(update, context, load_message("gpt"))
     return State.GPT
 
 async def gpt_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,12 +98,14 @@ async def gpt_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     my_message = await send_text(update, context, "... друкую .. обережно ... чекай...")
     answer = await get_gpt(context).send_question(load_prompt('gpt'), update.message.text)
     await my_message.edit_text(answer)
-    await send_text_buttons(update, context,"",{"start": "Повернутись в меню"} )
+    await send_text_buttons(update, context, "", {"start": "Повернутись в меню"})
     return State.GPT
 
 async def talk_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("talk_start")
     await send_image(update, context, 'talk')
+
+    # ToDo подумати на майбутнэ як це винести в окремий файл
     await send_text_buttons(update, context, load_message("talk"), {
         "talk_cobain": "Курт Кобейн",
         "talk_hawking": "Стівен Гокінг",
@@ -117,7 +132,7 @@ async def talk_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await print_message.edit_text(answer)
     except Exception as e:
         error_text = "Помилка при зверненні до GPT -крок talk_dialog"
-        logger.error("%s: %s",error_text, e)
+        logger.error("%s: %s", error_text, e)
         await print_message.edit_text(error_text)
     return State.TALK_DIALOG
 
@@ -208,7 +223,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
     try:
         voice_file = await update.message.voice.get_file()
-        with tempfile.NamedTemporaryFile(suffix=".ogg",delete=False) as temp_audio_file:
+        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as temp_audio_file:
             await voice_file.download_to_memory(out=temp_audio_file)
             temp_audio_file_path = temp_audio_file.name
 
@@ -216,7 +231,8 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         await user_message_status.edit_text(f"Ви сказали: \"{transcribed_text}\"\n... думаю ...")
 
         gpt_response_text = await get_gpt(context).add_message(transcribed_text)
-        await user_message_status.edit_text(f"Ви сказали: \"{transcribed_text}\"\nВідповідь GPT: \"{gpt_response_text}\"\n... генерую голос ...")
+        await user_message_status.edit_text(
+            f"Ви сказали: \"{transcribed_text}\"\nВідповідь GPT: \"{gpt_response_text}\"\n... генерую голос ...")
 
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_response_audio_file:
             await get_gpt(context).synthesize_speech(gpt_response_text, temp_response_audio_file.name)
@@ -239,9 +255,8 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         if 'temp_response_audio_file_path' in locals() and temp_response_audio_file_path:
             os.remove(temp_response_audio_file_path)
 
-    await send_text_buttons(update, context, "Продовжити голосовий чат?", {
-        'voice_finish': 'Закінчити голосовий чат',
-        'voice_continue': 'Продовжити',
+    await send_text_buttons(update, context, "-", {
+        'voice_finish': 'Закінчити голосовий чат'
     })
     return State.VOICE_DIALOG
 
@@ -252,6 +267,67 @@ async def voice_buttons_handler(update: Update, context: ContextTypes.DEFAULT_TY
         return await start(update, context)
     return State.VOICE_DIALOG
 
+async def profile_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("profile_start")
+    await send_image(update, context, 'profile')
+    await send_text(update, context, load_message("profile"))
+
+    context.user_data["resume_data"] = []
+    context.user_data["resume_question_index"] = 0
+
+    current_question_index = context.user_data["resume_question_index"]
+    await send_text(update, context, RESUME_QUESTIONS[current_question_index])
+
+    return State.PROFILE_DIALOG
+
+#ToDo Декомпозицыя. Дуже важка для розумыння ф-ція
+async def profile_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("profile_dialog")
+    user_answer = update.message.text
+    resume_data = context.user_data.get("resume_data", [])
+    current_question_index = context.user_data.get("resume_question_index", 0)
+
+    if current_question_index < len(RESUME_QUESTIONS):
+        resume_data.append(f"{RESUME_QUESTIONS[current_question_index]} {user_answer}")
+        context.user_data["resume_data"] = resume_data
+        context.user_data["resume_question_index"] += 1
+        current_question_index += 1
+
+    if current_question_index < len(RESUME_QUESTIONS):
+        await send_text(update, context, RESUME_QUESTIONS[current_question_index])
+        return State.PROFILE_DIALOG
+    else:
+        prompt = load_prompt("profile")
+        user_info = "\n".join(resume_data)
+
+        my_message = await send_text(update, context, "...ChatGPT генерує Ваше резюме...")
+        try:
+            answer = await get_gpt(context).send_question(prompt, user_info)
+            await my_message.edit_text(answer)
+        except Exception as e:
+            error_code = "Виникла помилка під час генерації резюме"
+            logger.error("%s : %s",error_code, e)
+            await my_message.edit_text(error_code)
+
+        context.user_data["resume_data"] = None
+        context.user_data["resume_question_index"] = 0
+
+        await send_text_buttons(update, context, "Ваше резюме згенеровано. Повернутись в меню?", {
+            "start": "Повернутись в меню"
+        })
+        return State.MAIN
+
+
+async def profile_buttons_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("profile_buttons_handler")
+    await update.callback_query.answer()
+    query = update.callback_query.data
+    if query == 'profile_finish':
+        context.user_data["resume_data"] = None
+        context.user_data["resume_question_index"] = 0
+        return await start(update, context)
+    return State.PROFILE_DIALOG
+
 
 def get_gpt(context):
     gpt = context.user_data.get("gpt")
@@ -261,32 +337,37 @@ def get_gpt(context):
     return gpt
 
 main_command_handlers = [
-        CommandHandler("start", start),
-        CommandHandler("random", random),
-        CommandHandler("talk", talk_start),
-        CommandHandler("quiz", quiz_start),
-        CommandHandler("gpt", gpt_start),
-        CommandHandler("voice", voice_start)
-    ]
+    CommandHandler("start", start),
+    CommandHandler("random", random),
+    CommandHandler("talk", talk_start),
+    CommandHandler("quiz", quiz_start),
+    CommandHandler("gpt", gpt_start),
+    CommandHandler("voice", voice_start),
+    CommandHandler("profile", profile_start)
+]
 
 conv = ConversationHandler(
     entry_points=main_command_handlers,
     states={
-        State.MAIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, menu_router ),
+        State.MAIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, menu_router),
                      CallbackQueryHandler(start, pattern="^start$")],
-        State.RANDOM: [CallbackQueryHandler(random_buttons_handler,pattern="^random_.*$")],
+        State.RANDOM: [CallbackQueryHandler(random_buttons_handler, pattern="^random_.*$")],
         State.GPT: [MessageHandler(filters.TEXT & ~filters.COMMAND, gpt_dialog), ],
         State.TALK_SELECT: [CallbackQueryHandler(talk_button, pattern="^talk_.*$")],
-        State.TALK_DIALOG: [MessageHandler(filters.TEXT & ~filters.COMMAND, talk_dialog),],
+        State.TALK_DIALOG: [MessageHandler(filters.TEXT & ~filters.COMMAND, talk_dialog), ],
         State.QUIZ_SELECT: [
-                            CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_.*$")
-                           ],
+            CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_.*$")
+        ],
         State.QUIZ_DIALOG: [MessageHandler(filters.TEXT & ~filters.COMMAND, quiz_dialog),
                             CallbackQueryHandler(quiz_buttons_handler, pattern="^quiz_(finish|new_quiz)$")],
         State.VOICE_DIALOG: [
             MessageHandler(filters.VOICE, voice_message_handler),
             CallbackQueryHandler(voice_buttons_handler, pattern="^voice_.*$"),
             MessageHandler(filters.TEXT & ~filters.COMMAND, voice_message_handler)
+        ],
+        State.PROFILE_DIALOG: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, profile_dialog),
+            CallbackQueryHandler(profile_buttons_handler, pattern="^profile_.*$")
         ]
     },
     fallbacks=main_command_handlers,
