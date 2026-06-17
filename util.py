@@ -1,3 +1,4 @@
+import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, \
     BotCommand, MenuButtonCommands, BotCommandScopeChat, MenuButtonDefault
 from telegram import Update
@@ -81,3 +82,14 @@ async def default_callback_handler(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query.data
     message = str(update.callback_query.message.message_id)
     await send_html(update, context, f'You have pressed button with {query} callback mesage = {message}')
+
+
+async def voice_to_text(tempfile, voice_file):
+    with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as temp_audio_file:
+        await voice_file.download_to_memory(out=temp_audio_file)
+        return temp_audio_file.name
+
+
+def delete_file(name_file:str):
+    if name_file in locals() and locals()[name_file]:
+        os.remove(locals()[name_file])

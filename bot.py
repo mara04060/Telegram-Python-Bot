@@ -1,4 +1,3 @@
-import os
 import tempfile
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, ContextTypes, CommandHandler, ConversationHandler, \
@@ -9,9 +8,9 @@ from gpt import ChatGptService
 from log_info import logger
 from state import State
 from util import (load_message, send_text, send_image, show_main_menu,
-                  default_callback_handler, load_prompt, send_text_buttons)
+                  default_callback_handler, load_prompt, send_text_buttons, voice_to_text, delete_file)
 
-#ToDo подумати на майбутнэ як це винести в окремий файл + Формування меню
+#ToDo подумати на майбутнэ як це винести в окремий файл
 RESUME_QUESTIONS = [
     "ПІБ ТА МІСТО",
     "БАЖАНА ПОСАДА",
@@ -20,6 +19,24 @@ RESUME_QUESTIONS = [
     "ОСТАННЄ МІСЦЕ РОБОТИ",
     "ОСВІТА ТА ДОДАТКОВА ІНФОРМАЦІЯ"
 ]
+
+MENU = {
+        '/start': 'Головне меню',
+        '/random': 'Дізнатися випадковий цікавий факт 🧠',
+        '/gpt': 'Задати питання чату GPT 🤖',
+        '/talk': 'Поговорити з відомою особистістю 👤',
+        '/quiz': 'Взяти участь у квізі ❓',
+        '/voice': 'Голосовий ChatGPT 🎤',
+        "/profile": "Генерація Резюме-IT 😎"
+    }
+
+MENU_TALK = {
+        "talk_cobain": "Курт Кобейн",
+        "talk_hawking": "Стівен Гокінг",
+        "talk_nietzsche": "рідріх Ніцше",
+        "talk_queen": "Королева Єлизавета II",
+        "talk_tolkien": "Дж.Р.Р. Толкін",
+    }
 
 async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("menu_router")
@@ -48,18 +65,9 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("start")
     await send_image(update, context, 'main')
-    await send_text(update, context, load_message('main'))
-
-    # ToDo подумати на майбутнэ як це винести в окремий файл + Формування меню
-    await show_main_menu(update, context, {
-        'start': 'Головне меню',
-        'random': 'Дізнатися випадковий цікавий факт 🧠',
-        'gpt': 'Задати питання чату GPT 🤖',
-        'talk': 'Поговорити з відомою особистістю 👤',
-        'quiz': 'Взяти участь у квізі ❓',
-        'voice': 'Голосовий ChatGPT 🎤',
-        "profile": "Генерація Резюме-IT 😎"
-    })
+    menu = "\n".join(f"{key} - {value}" for key, value in MENU.items())
+    await send_text(update, context, load_message('main') + menu)
+    await show_main_menu(update, context, MENU)
     return State.MAIN
 
 
@@ -67,10 +75,7 @@ async def random(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("random")
     await send_image(update, context, 'random')
     answer = await get_gpt(context).send_question(load_prompt('random'), 'Давай рандомний факт')
-    await send_text_buttons(
-        update, context,
-        answer,
-        {
+    await send_text_buttons(update, context,answer,{
             'random_finish': 'Закінчити',
             'random_one_more': 'Хочу ще факт',
         }
@@ -104,15 +109,7 @@ async def gpt_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def talk_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("talk_start")
     await send_image(update, context, 'talk')
-
-    # ToDo подумати на майбутнэ як це винести в окремий файл
-    await send_text_buttons(update, context, load_message("talk"), {
-        "talk_cobain": "Курт Кобейн",
-        "talk_hawking": "Стівен Гокінг",
-        "talk_nietzsche": "рідріх Ніцше",
-        "talk_queen": "Королева Єлизавета II",
-        "talk_tolkien": "Дж.Р.Р. Толкін",
-    })
+    await send_text_buttons(update, context, load_message("talk"), MENU_TALK)
     return State.TALK_SELECT
 
 async def talk_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -179,10 +176,7 @@ async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await send_text(update, context, error_text)
 
-    await send_text_buttons(
-        update, context,
-        "Обери подальшу дію:",
-        {
+    await send_text_buttons(update, context,"Обери подальшу дію:",{
             'quiz_finish': 'Закінчити'
         }
     )
@@ -199,40 +193,39 @@ def math_score_quiz(context, gpt_answer):
     context.user_data["quiz_score"] = current_score
     return current_score
 
-
 async def voice_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("voice_start")
     await send_image(update, context, 'voice')
     await send_text(update, context, load_message("voice"))
     return State.VOICE_DIALOG
 
-async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info("voice_message_handler")
+async def close_or_next_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.text:
-        if update.message.text.lower() == "закінчити":
-            return await start(update, context)
+        logger.info("message: %s", update.message.text.lower())
 
-        await send_text(update, context, "Будь ласка, надішліть голосове повідомлення або натисніть кнопку.")
-        return State.VOICE_DIALOG
+        #Словом можна перейти до завершення аудіодыалогу
+        if update.message.text.lower() in ["завершити", "закінчити", "close", "clear"]:
+            return await start(update, context)
+        else:
+            await send_text(update, context, "Будь ласка, надішліть голосове повідомлення або натисніть кнопку.")
+            return State.VOICE_DIALOG
 
     if not update.message or not update.message.voice:
         await send_text(update, context, "Будь ласка, надішліть голосове повідомлення.")
         return State.VOICE_DIALOG
+    return None
 
+
+async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("voice_message_handler")
+    await close_or_next_dialog(update, context)
     user_message_status = await send_text(update, context, "... розпізнаю мову ...")
+    error_text = "Виникла помилка під час обробки голосового повідомлення. Спробуйте ще раз."
 
     try:
-        voice_file = await update.message.voice.get_file()
-        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as temp_audio_file:
-            await voice_file.download_to_memory(out=temp_audio_file)
-            temp_audio_file_path = temp_audio_file.name
-
+        temp_audio_file_path = await voice_to_text(tempfile, await update.message.voice.get_file())
         transcribed_text = await get_gpt(context).transcribe_audio(temp_audio_file_path)
-        await user_message_status.edit_text(f"Ви сказали: \"{transcribed_text}\"\n... думаю ...")
-
         gpt_response_text = await get_gpt(context).add_message(transcribed_text)
-        await user_message_status.edit_text(
-            f"Ви сказали: \"{transcribed_text}\"\nВідповідь GPT: \"{gpt_response_text}\"\n... генерую голос ...")
 
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_response_audio_file:
             await get_gpt(context).synthesize_speech(gpt_response_text, temp_response_audio_file.name)
@@ -244,18 +237,14 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e:
         logger.error("Ошибка в voice_message_handler: %s", e)
         if user_message_status:
-            await user_message_status.edit_text(
-                "Виникла помилка під час обробки голосового повідомлення. Спробуйте ще раз.")
+            await user_message_status.edit_text(error_text)
         else:
-            await send_text(update, context,
-                            "Виникла помилка під час обробки голосового повідомлення. Спробуйте ще раз.")
+            await send_text(update, context, error_text)
     finally:
-        if 'temp_audio_file_path' in locals() and temp_audio_file_path:
-            os.remove(temp_audio_file_path)
-        if 'temp_response_audio_file_path' in locals() and temp_response_audio_file_path:
-            os.remove(temp_response_audio_file_path)
+        delete_file('temp_audio_file_path' )
+        delete_file('temp_response_audio_file_path')
 
-    await send_text_buttons(update, context, "-", {
+    await send_text_buttons(update, context, "------------", {
         'voice_finish': 'Закінчити голосовий чат'
     })
     return State.VOICE_DIALOG
