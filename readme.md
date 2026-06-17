@@ -70,6 +70,15 @@
 </code>
 <p />
 
+Перед запуском, бажано (не обовёязково) зробити видалення минулого контейнеру:
+<p />
+<code>
+docker stop my-telegram-bot<br />
+docker rm my-telegram-bot<br />
+docker run -d --name my-telegram-bot telegram-bot
+</code>
+<p />
+
 Запуск контейнеру:
 <p />
 <code>
