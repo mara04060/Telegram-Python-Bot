@@ -8,7 +8,7 @@ from gpt import ChatGptService
 from log_info import logger
 from state import State
 from util import (load_message, send_text, send_image, show_main_menu,
-                  default_callback_handler, load_prompt, send_text_buttons, voice_to_text, delete_file)
+                  default_callback_handler, load_prompt, send_text_buttons, voice_to_text, delete_file, send_html)
 
 MENU = {
         '/start': 'Головне меню',
@@ -136,10 +136,14 @@ async def talk_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Quiz - module
 async def quiz_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("quiz_start")
-    context.user_data.setdefault("quiz_score", 0)
     await send_image(update, context, 'quiz')
+    if context.user_data.get("quiz_score") is not None:
+        await send_html(update, context, f"<b>Ви набрали {context.user_data["quiz_score"]} балів на попереньому Квізі</b>")
+        context.user_data["quiz_score"] = 0
+
+    context.user_data.setdefault("quiz_score", 0)
     await send_text_buttons(update, context, load_message("quiz"), {
-        "quiz_prog": "Python3 - рулить - ти лише підрулюєш",
+        "quiz_prog": "Python3 - рулить - ти лише підрулюєш ",
         "quiz_math": "Математика без стресу",
         "quiz_biology": "Біологія - понад усе"
     })
@@ -150,14 +154,15 @@ async def quiz_buttons_handler(update: Update, context):
     await update.callback_query.answer()
     query = update.callback_query.data
     if query == 'quiz_finish':
-        return await start(update, context)
+        return await quiz_start(update, context)
     else:
         return await quiz_button(update, context)
 
 async def quiz_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("quiz_button")
+    my_message = await send_text(update, context, "... друкую .. чекай...")
     answer = await get_gpt(context).send_question(load_prompt('quiz'), update.callback_query.data)
-    await send_text(update, context, answer)
+    await my_message.edit_text(answer)
     return State.QUIZ_DIALOG
 
 async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -175,8 +180,8 @@ async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await print_message.edit_text(error_text)
         else:
             await send_text(update, context, error_text)
-    await send_text_buttons(update, context,"Обери подальшу дію:",{
-            'quiz_finish': 'Закінчити'
+    await send_text_buttons(update, context,"відповідай або:",{
+        'quiz_finish': 'Закінчити'
         }
     )
     return State.QUIZ_DIALOG
