@@ -244,7 +244,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         delete_file('temp_audio_file_path' )
         delete_file('temp_response_audio_file_path')
 
-    await send_text_buttons(update, context, "------------", {
+    await send_text_buttons(update, context, "-", {
         'voice_finish': 'Закінчити голосовий чат'
     })
     return State.VOICE_DIALOG
