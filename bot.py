@@ -136,12 +136,12 @@ async def talk_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Quiz - module
 async def quiz_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("quiz_start")
-    await send_image(update, context, 'quiz')
-    if context.user_data.get("quiz_score") is not None:
-        await send_html(update, context, f"<b>Ви набрали {context.user_data["quiz_score"]} балів на попереньому Квізі</b>")
-        context.user_data["quiz_score"] = 0
-
     context.user_data.setdefault("quiz_score", 0)
+    context.user_data.setdefault("cuount_quiz", 0)
+    if context.user_data.get("cuount_quiz") > 0:
+        context.user_data["quiz_score"] = 0
+        context.user_data["cuount_quiz"] = 0
+    await send_image(update, context, 'quiz')
     await send_text_buttons(update, context, load_message("quiz"), {
         "quiz_prog": "Python3 - рулить - ти лише підрулюєш ",
         "quiz_math": "Математика без стресу",
@@ -171,8 +171,8 @@ async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         print_message = await send_text(update, context, "... перевіряю...")
         gpt_answer = await get_gpt(context).add_message(update.message.text)
-        current_score = math_score_quiz(context, gpt_answer)
-        await print_message.edit_text(f"{gpt_answer}\n Ваш поточний рахунок: {current_score}.")
+        current_score, cuount_quiz = math_score_quiz(context, gpt_answer)
+        await print_message.edit_text(f"{gpt_answer}\n Ваш поточний рахунок: {current_score}.\n Кількість питань: {cuount_quiz}")
     except Exception as e:
         error_text = "Помилка при зверненні до GPT -крок quiz_dialog"
         logger.error("%s: %s", error_text, e)
@@ -189,14 +189,17 @@ async def quiz_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Current score for Quiz
 def math_score_quiz(context, gpt_answer):
     current_score = context.user_data.get("quiz_score", 0)
+    cuount_quiz = context.user_data.get("cuount_quiz", 0)
+    cuount_quiz +=1
     if "Правильно!" in gpt_answer:
         current_score += 1
     elif "Неправильно!" in gpt_answer:
         current_score -= 1
     else:
-        return current_score
+        cuount_quiz -= 1 # Якщо немає відповыді від ГПТ то не зараховуємо спробу
     context.user_data["quiz_score"] = current_score
-    return current_score
+    context.user_data["cuount_quiz"] = cuount_quiz
+    return current_score, cuount_quiz
 
 # Voice chat in GPT - module
 async def voice_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
