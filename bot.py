@@ -1,4 +1,5 @@
 import tempfile
+
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, ContextTypes, CommandHandler, ConversationHandler, \
     MessageHandler, filters
@@ -8,7 +9,7 @@ from gpt import ChatGptService
 from log_info import logger
 from state import State
 from util import (load_message, send_text, send_image, show_main_menu,
-                  default_callback_handler, load_prompt, send_text_buttons, voice_to_text, delete_file, send_html)
+                  default_callback_handler, load_prompt, send_text_buttons, voice_to_text, delete_file)
 
 MENU = {
         '/start': 'Головне меню',
