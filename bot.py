@@ -380,7 +380,31 @@ conv = ConversationHandler(
     per_message=False
 )
 
-app = ApplicationBuilder().token(credentials.BOT_TOKEN).build()
-app.add_handler(conv)
-app.add_handler(CallbackQueryHandler(default_callback_handler))
-app.run_polling(allowed_updates=Update.ALL_TYPES)
+def create_application():
+    application = (ApplicationBuilder().token(credentials.BOT_TOKEN).build())
+    application.add_handler(conv)
+    application.add_handler(CallbackQueryHandler(default_callback_handler))
+    return application
+
+def run_polling():
+    app = create_application()
+    logger.info("Starting bot in POLLING mode")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+def run_webhook():
+    app = create_application()
+    logger.info("Starting bot in WEBHOOK mode")
+    app.run_webhook(listen="0.0.0.0",port=credentials.WEBHOOK_PORT,
+        webhook_url=f"{credentials.WEBHOOK_URL}",
+        secret_token=credentials.WEBHOOK_SECRET_TOKEN,
+        allowed_updates=Update.ALL_TYPES,
+    )
+
+def main():
+    if credentials.BOT_MODE.upper() == "WEBHOOK":
+        run_webhook()
+    else:
+        run_polling()
+
+if __name__ == "__main__":
+    main()
