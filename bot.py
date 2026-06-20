@@ -381,10 +381,10 @@ conv = ConversationHandler(
 )
 
 def create_application():
-    application = (ApplicationBuilder().token(credentials.BOT_TOKEN).build())
-    application.add_handler(conv)
-    application.add_handler(CallbackQueryHandler(default_callback_handler))
-    return application
+    app = ApplicationBuilder().token(credentials.BOT_TOKEN).build()
+    app.add_handler(conv)
+    app.add_handler(CallbackQueryHandler(default_callback_handler))
+    return app
 
 def run_polling():
     app = create_application()
