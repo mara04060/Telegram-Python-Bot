@@ -2,7 +2,7 @@ import tempfile
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, ContextTypes, CommandHandler, ConversationHandler, \
-    MessageHandler, filters
+    MessageHandler, filters, Application
 
 import credentials
 from gpt import ChatGptService
@@ -380,10 +380,10 @@ conv = ConversationHandler(
     per_message=False
 )
 
+
 def create_application():
-    app = ApplicationBuilder().token(credentials.BOT_TOKEN).build()
+    app = Application.builder().token(credentials.BOT_TOKEN).build()
     app.add_handler(conv)
-    app.add_handler(CallbackQueryHandler(default_callback_handler))
     return app
 
 def run_polling():
@@ -394,11 +394,7 @@ def run_polling():
 def run_webhook():
     app = create_application()
     logger.info("Starting bot in WEBHOOK mode")
-    app.run_webhook(listen="0.0.0.0",port=credentials.WEBHOOK_PORT,
-        webhook_url=f"{credentials.WEBHOOK_URL}",
-        secret_token=credentials.WEBHOOK_SECRET_TOKEN,
-        allowed_updates=Update.ALL_TYPES,
-    )
+
 
 def main():
     if credentials.BOT_MODE.upper() == "WEBHOOK":
