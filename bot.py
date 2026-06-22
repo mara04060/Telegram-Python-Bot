@@ -207,6 +207,7 @@ async def voice_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("voice_start")
     await send_image(update, context, 'voice')
     await send_text(update, context, load_message("voice"))
+    await get_gpt(context).set_prompt(load_prompt("voice"))
     return State.VOICE_DIALOG
 
 async def close_or_next_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
