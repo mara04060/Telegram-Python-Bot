@@ -151,250 +151,85 @@ async def test_menu_router_unknown_command(update,context):
 async def test_menu_router_without_message(
         context
 ):
-
     update = MagicMock()
     update.message = None
-
-    result = await menu_router(
-        update,
-        context
-    )
-
+    result = await menu_router( update, context )
     assert result == State.MAIN
 
 
-# ==========================================================
+
 # close_or_next_dialog
-# ==========================================================
 
 @pytest.mark.asyncio
-async def test_close_or_next_dialog_finish(
-        update,
-        context
-):
-
+async def test_close_or_next_dialog_finish( update, context):
     update.message.text = "закінчити"
-
-    with patch(
-        "bot.start",
-        AsyncMock(return_value=State.MAIN)
-    ):
-
-        result = await close_or_next_dialog(
-            update,
-            context
-        )
-
+    with patch("bot.start", AsyncMock(return_value=State.MAIN)):
+        result = await close_or_next_dialog(update,context )
         assert result == State.MAIN
 
-
 @pytest.mark.asyncio
-async def test_close_or_next_dialog_invalid_text(
-        update,
-        context
-):
-
+async def test_close_or_next_dialog_invalid_text(update,context):
     update.message.text = "hello"
-
-    with patch(
-        "bot.send_text",
-        AsyncMock()
-    ) as send_text:
-
-        result = await close_or_next_dialog(
-            update,
-            context
-        )
-
+    with patch("bot.send_text", AsyncMock()) as send_text:
+        result = await close_or_next_dialog(update,context)
         send_text.assert_awaited_once()
-
         assert result == State.VOICE_DIALOG
 
-
 @pytest.mark.asyncio
-async def test_close_or_next_dialog_without_voice(
-        context
-):
-
+async def test_close_or_next_dialog_without_voice( context):
     update = MagicMock()
-
     update.message = MagicMock()
     update.message.text = None
     update.message.voice = None
-
-    with patch(
-        "bot.send_text",
-        AsyncMock()
-    ) as send_text:
-
-        result = await close_or_next_dialog(
-            update,
-            context
-        )
-
+    with patch("bot.send_text",AsyncMock()) as send_text:
+        result = await close_or_next_dialog(update,context)
         send_text.assert_awaited_once()
-
         assert result == State.VOICE_DIALOG
 
-
-# ==========================================================
 # generation_profile
-# ==========================================================
-
 @pytest.mark.asyncio
-async def test_generation_profile_success(
-        update,
-        context
-):
-
+async def test_generation_profile_success(update,context):
     message = AsyncMock()
-
     gpt = AsyncMock()
-
-    gpt.send_question.return_value = (
-        "READY CV"
-    )
-
+    gpt.send_question.return_value = ("READY CV" )
     context.user_data["gpt"] = gpt
-
-    with patch(
-        "bot.load_prompt",
-        return_value="prompt"
-    ), patch(
-        "bot.send_text",
-        AsyncMock(return_value=message)
-    ), patch(
-        "bot.send_text_buttons",
-        AsyncMock()
-    ):
-
-        result = await generation_profile(
-            update,
-            context,
-            [
-                "name",
-                "skills"
-            ]
-        )
-
-    message.edit_text.assert_awaited_once_with(
-        "READY CV"
-    )
-
+    with (patch( "bot.load_prompt",return_value="prompt"), patch("bot.send_text", AsyncMock(return_value=message)), patch( "bot.send_text_buttons", AsyncMock() )):
+        result = await generation_profile(update,context,["name","skills" ])
+    message.edit_text.assert_awaited_once_with("READY CV" )
     assert context.user_data["resume_data"] == []
-
-    assert (
-        context.user_data[
-            "resume_question_index"
-        ] == 0
-    )
-
+    assert (context.user_data[ "resume_question_index"] == 0)
     assert result == State.MAIN
 
-
 @pytest.mark.asyncio
-async def test_generation_profile_exception(
-        update,
-        context
-):
-
+async def test_generation_profile_exception(update,context):
     message = AsyncMock()
-
     gpt = AsyncMock()
-
-    gpt.send_question.side_effect = (
-        Exception("GPT ERROR")
-    )
-
+    gpt.send_question.side_effect = (Exception("GPT ERROR"))
     context.user_data["gpt"] = gpt
+    with (patch("bot.load_prompt", return_value="prompt"), patch("bot.send_text",AsyncMock(return_value=message)),
+          patch("bot.send_text_buttons",AsyncMock())):
+        await generation_profile( update,context,["name"])
+    message.edit_text.assert_awaited_once_with("Виникла помилка під час генерації резюме")
 
-    with patch(
-        "bot.load_prompt",
-        return_value="prompt"
-    ), patch(
-        "bot.send_text",
-        AsyncMock(return_value=message)
-    ), patch(
-        "bot.send_text_buttons",
-        AsyncMock()
-    ):
-
-        await generation_profile(
-            update,
-            context,
-            ["name"]
-        )
-
-    message.edit_text.assert_awaited_once_with(
-        "Виникла помилка під час генерації резюме"
-    )
-
-
-# ==========================================================
 # talk_dialog
-# ==========================================================
-
 @pytest.mark.asyncio
-async def test_talk_dialog_success(
-        update,
-        context
-):
-
+async def test_talk_dialog_success(update,context):
     msg = AsyncMock()
-
     gpt = AsyncMock()
-
-    gpt.add_message.return_value = (
-        "GPT ANSWER"
-    )
-
+    gpt.add_message.return_value = ("GPT ANSWER")
     context.user_data["gpt"] = gpt
-
-    with patch(
-        "bot.send_text",
-        AsyncMock(return_value=msg)
-    ):
-
-        result = await talk_dialog(
-            update,
-            context
-        )
-
-    msg.edit_text.assert_awaited_once_with(
-        "GPT ANSWER"
-    )
-
+    with patch("bot.send_text", AsyncMock(return_value=msg)):
+        result = await talk_dialog( update, context )
+    msg.edit_text.assert_awaited_once_with("GPT ANSWER" )
     assert result == State.TALK_DIALOG
 
-
 @pytest.mark.asyncio
-async def test_talk_dialog_exception(
-        update,
-        context
-):
-
+async def test_talk_dialog_exception( update, context):
     msg = AsyncMock()
-
     gpt = AsyncMock()
-
-    gpt.add_message.side_effect = (
-        Exception("GPT ERROR")
-    )
-
+    gpt.add_message.side_effect = ( Exception("GPT ERROR") )
     context.user_data["gpt"] = gpt
-
-    with patch(
-        "bot.send_text",
-        AsyncMock(return_value=msg)
-    ):
-
-        result = await talk_dialog(
-            update,
-            context
-        )
-
-    msg.edit_text.assert_awaited_once_with(
-        "Помилка при зверненні до GPT -крок talk_dialog"
-    )
-
+    with patch("bot.send_text", AsyncMock(return_value=msg) ):
+        result = await talk_dialog(update, context )
+    msg.edit_text.assert_awaited_once_with("Помилка при зверненні до GPT -крок talk_dialog" )
     assert result == State.TALK_DIALOG
