@@ -207,16 +207,12 @@ async def voice_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("voice_start")
     await send_image(update, context, 'voice')
     await send_text(update, context, load_message("voice"))
+    await get_gpt(context).set_prompt(load_prompt("voice"))
     return State.VOICE_DIALOG
 
 async def close_or_next_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.text:
         logger.info("message: %s", update.message.text.lower())
-        if update.message.text.lower() in ["завершити", "закінчити", "close", "clear"]:
-            return await start(update, context)
-        else:
-            await send_text(update, context, "Будь ласка, надішліть голосове повідомлення або натисніть кнопку.")
-            return State.VOICE_DIALOG
     if not update.message or not update.message.voice:
         await send_text(update, context, "Будь ласка, надішліть голосове повідомлення.")
         return State.VOICE_DIALOG
@@ -228,6 +224,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
     user_message_status = await send_text(update, context, "... розпізнаю мову ...")
     error_text = "Виникла помилка під час обробки голосового повідомлення. Спробуйте ще раз."
     try:
+        logger.info("GPTData = %s", get_gpt(context).message_list)
         temp_audio_file_path = await voice_to_text(tempfile, await update.message.voice.get_file())
         transcribed_text = await get_gpt(context).transcribe_audio(temp_audio_file_path)
         gpt_response_text = await get_gpt(context).add_message(transcribed_text)
@@ -394,7 +391,11 @@ def run_polling():
 def run_webhook():
     app = create_application()
     logger.info("Starting bot in WEBHOOK mode")
-
+    # app.run_webhook(listen="0.0.0.0",port=credentials.WEBHOOK_PORT,
+    #     webhook_url=f"{credentials.WEBHOOK_URL}",
+    #     secret_token=credentials.WEBHOOK_SECRET_TOKEN,
+    #     allowed_updates=Update.ALL_TYPES,
+    # )
 
 def main():
     if credentials.BOT_MODE.upper() == "WEBHOOK":
