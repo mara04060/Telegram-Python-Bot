@@ -242,6 +242,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         else:
             await send_text(update, context, error_text)
     finally:
+        await user_message_status.delete()
         delete_file('temp_audio_file_path' )
         delete_file('temp_response_audio_file_path')
     await send_text_buttons(update, context, "-", {
