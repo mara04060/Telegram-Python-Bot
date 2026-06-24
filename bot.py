@@ -1,4 +1,5 @@
 import tempfile
+
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, ContextTypes, CommandHandler, ConversationHandler, \
     MessageHandler, filters
@@ -8,7 +9,7 @@ from gpt import ChatGptService
 from log_info import logger
 from state import State
 from util import (load_message, send_text, send_image, show_main_menu,
-                  default_callback_handler, load_prompt, send_text_buttons, voice_to_text, delete_file, send_html)
+                  default_callback_handler, load_prompt, send_text_buttons, voice_to_text, delete_file)
 
 MENU = {
         '/start': 'Головне меню',
@@ -123,7 +124,7 @@ async def talk_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def talk_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("talk_dialog")
-    print_message = await send_text(update, context, "... щось друкуэ...")
+    print_message = await send_text(update, context, "... щось друкує...")
     try:
         answer = await get_gpt(context).add_message(update.message.text)
         await print_message.edit_text(answer)
@@ -196,7 +197,7 @@ def math_score_quiz(context, gpt_answer):
     elif "Неправильно!" in gpt_answer:
         current_score -= 1
     else:
-        cuount_quiz -= 1 # Якщо немає відповыді від ГПТ то не зараховуємо спробу
+        cuount_quiz -= 1 # Якщо немає відповіді від ГПТ то не зараховуємо спробу
     context.user_data["quiz_score"] = current_score
     context.user_data["cuount_quiz"] = cuount_quiz
     return current_score, cuount_quiz
@@ -206,6 +207,7 @@ async def voice_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("voice_start")
     await send_image(update, context, 'voice')
     await send_text(update, context, load_message("voice"))
+    await get_gpt(context).set_prompt(load_prompt("voice"))
     return State.VOICE_DIALOG
 
 async def close_or_next_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
