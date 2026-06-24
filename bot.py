@@ -124,7 +124,7 @@ async def talk_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def talk_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("talk_dialog")
-    print_message = await send_text(update, context, "... щось друкуэ...")
+    print_message = await send_text(update, context, "... щось друкує...")
     try:
         answer = await get_gpt(context).add_message(update.message.text)
         await print_message.edit_text(answer)
@@ -197,7 +197,7 @@ def math_score_quiz(context, gpt_answer):
     elif "Неправильно!" in gpt_answer:
         current_score -= 1
     else:
-        cuount_quiz -= 1 # Якщо немає відповыді від ГПТ то не зараховуємо спробу
+        cuount_quiz -= 1 # Якщо немає відповіді від ГПТ то не зараховуємо спробу
     context.user_data["quiz_score"] = current_score
     context.user_data["cuount_quiz"] = cuount_quiz
     return current_score, cuount_quiz
